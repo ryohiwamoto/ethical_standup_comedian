@@ -1,0 +1,7 @@
+# api
+.env
+*.env
+
+# python 
+_pycache_/
+*.pyc
