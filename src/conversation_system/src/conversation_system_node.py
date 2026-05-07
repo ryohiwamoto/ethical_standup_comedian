@@ -5,6 +5,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -52,7 +53,7 @@ class QTChatTerminal:
             "When someone requests a stand-up performance, you MUST immediately switch into a 30-seconds routine."
         )
 
-        self.play_gesture("QT/thinking")
+        #self.play_gesture("thinking")
 
         try:
             response = self.client.chat.completions.create(
@@ -83,7 +84,7 @@ class QTChatTerminal:
             gpt_response = self.ask_gpt(user_input)
             print(f"answer: {gpt_response}")
 
-            self.play_gesture("QT/talk")
+            self.play_gesture("QT/happy")
 
             # QTrobotに喋らせる
             msg = String()
