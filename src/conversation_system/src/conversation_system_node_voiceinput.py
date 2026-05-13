@@ -13,6 +13,7 @@ load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 RECORD_SECONDS = int(os.getenv('RECORD_SECONDS', '5'))
+IGNORED_TRANSCRIPTS = {"you", "thank you", "thanks"}
 
 AUDIO_FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -87,6 +88,16 @@ class QTChatTerminal:
 
             text = transcription.text.strip()
             print(f"you: {text}")
+
+            normalized_text = text.lower().strip(" .,!?:;")
+            if len(normalized_text) < 3:
+                print("Ignored: too short")
+                return ""
+
+            if normalized_text in IGNORED_TRANSCRIPTS:
+                print("Ignored: likely silence hallucination")
+                return ""
+
             return text
 
         except Exception as e:
@@ -141,6 +152,8 @@ class QTChatTerminal:
         print("---------------------------------------")
         
         while not rospy.is_shutdown():
+            input("Press Enter and speak...")
+
             # マイクから入力を受け取り、Whisperで文字起こしする
             user_input = self.listen_with_whisper()
             
