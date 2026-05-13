@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import rospy
 from std_msgs.msg import String
+from audio_common_msgs.msg import AudioData
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import wave
 import tempfile
-import pyaudio
 
 
 load_dotenv()
@@ -15,10 +15,9 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 RECORD_SECONDS = int(os.getenv('RECORD_SECONDS', '5'))
 IGNORED_TRANSCRIPTS = {"you", "thank you", "thanks"}
 
-AUDIO_FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
-CHUNK = 1024
+AUDIO_WIDTH = 2
 
 
 class QTChatTerminal:
@@ -27,9 +26,12 @@ class QTChatTerminal:
 
         # OpenAIの初期化 (client を正しく定義)
         self.client = OpenAI(api_key=OPENAI_API_KEY)
+        self.audio_frames = []
+        self.is_recording = False
         
         self.speech_pub = rospy.Publisher('/qt_robot/speech/say', String, queue_size=10)
         self.gesture_pub = rospy.Publisher('/qt_robot/gesture/play', String, queue_size=10)
+        self.audio_sub = rospy.Subscriber('/qt_respeaker_app/channel0', AudioData, self.audio_callback)
         
         rospy.sleep(1)
 
@@ -41,27 +43,21 @@ class QTChatTerminal:
         msg.data = gesture_name
         self.gesture_pub.publish(msg)
 
+    def audio_callback(self, msg):
+        if self.is_recording:
+            self.audio_frames.append(bytes(msg.data))
+
     def record_audio(self):
-        audio = pyaudio.PyAudio()
-
-        stream = audio.open(
-            format=AUDIO_FORMAT,
-            channels=CHANNELS,
-            rate=RATE,
-            input=True,
-            frames_per_buffer=CHUNK
-        )
-
         print(f"Listening for {RECORD_SECONDS} seconds...")
-        frames = []
+        self.audio_frames = []
+        self.is_recording = True
+        rospy.sleep(RECORD_SECONDS)
+        self.is_recording = False
+        audio_data = b''.join(self.audio_frames)
 
-        for _ in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-            data = stream.read(CHUNK)
-            frames.append(data)
-
-        stream.stop_stream()
-        stream.close()
-        audio.terminate()
+        if not audio_data:
+            rospy.logwarn("No audio data received from /qt_respeaker_app/channel0.")
+            return ""
 
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         temp_path = temp_file.name
@@ -69,14 +65,17 @@ class QTChatTerminal:
 
         with wave.open(temp_path, 'wb') as wf:
             wf.setnchannels(CHANNELS)
-            wf.setsampwidth(audio.get_sample_size(AUDIO_FORMAT))
+            wf.setsampwidth(AUDIO_WIDTH)
             wf.setframerate(RATE)
-            wf.writeframes(b''.join(frames))
+            wf.writeframes(audio_data)
 
         return temp_path
 
     def listen_with_whisper(self):
         audio_path = self.record_audio()
+
+        if not audio_path:
+            return ""
 
         try:
             with open(audio_path, "rb") as audio_file:
