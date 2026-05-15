@@ -2,7 +2,7 @@
 import cv2
 
 
-CAMERA_INDEX = 0
+CAMERA_INDEX = 1
 
 
 def main():
@@ -30,8 +30,8 @@ def main():
         faces = face_cascade.detectMultiScale(
             gray,
             scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(60, 60),
+            minNeighbors=4,
+            minSize=(40, 40),
         )
 
         print(f"faces: {len(faces)}")
