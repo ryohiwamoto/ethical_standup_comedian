@@ -26,6 +26,10 @@ SMILE_HIGH_THRESHOLD = 0.65
 SMILE_LOW_THRESHOLD = 0.35
 
 
+def clamp(value):
+    return max(0.0, min(1.0, value))
+
+
 def normalized_distance(a, b):
     dx = a.x - b.x
     dy = a.y - b.y
@@ -63,6 +67,12 @@ class QTChatTerminal:
         self.face_seen = False
         self.current_smile = 0.0
         self.smile_history = []
+        self.style = {
+            "boldness": 0.50,
+            "sarcasm": 0.60,
+            "self_deprecation": 0.60,
+            "response_length": 0.35,
+        }
         self.feedback_lock = threading.Lock()
         
         self.speech_pub = rospy.Publisher('/qt_robot/speech/say', String, queue_size=10)
@@ -140,6 +150,63 @@ class QTChatTerminal:
             "If mood is brief_smile, keep going but do not over-escalate. "
             "If mood is not_smiling, make the answer shorter and more self-deprecating. "
             "If mood is no_audience_detected, make a short robot-like aside."
+        )
+
+    def update_style_from_feedback(self, feedback):
+        mood = feedback["mood"]
+
+        if mood == "sustained_smiling":
+            deltas = {
+                "boldness": 0.10,
+                "sarcasm": 0.05,
+                "self_deprecation": -0.05,
+                "response_length": 0.05,
+            }
+        elif mood == "brief_smile":
+            deltas = {
+                "boldness": 0.05,
+                "sarcasm": 0.02,
+                "self_deprecation": 0.00,
+                "response_length": 0.00,
+            }
+        elif mood == "not_smiling":
+            deltas = {
+                "boldness": -0.10,
+                "sarcasm": -0.05,
+                "self_deprecation": 0.10,
+                "response_length": -0.10,
+            }
+        elif mood == "no_audience_detected":
+            deltas = {
+                "boldness": -0.05,
+                "sarcasm": 0.00,
+                "self_deprecation": 0.05,
+                "response_length": -0.15,
+            }
+        else:
+            deltas = {
+                "boldness": 0.00,
+                "sarcasm": 0.00,
+                "self_deprecation": 0.00,
+                "response_length": 0.00,
+            }
+
+        for key, delta in deltas.items():
+            self.style[key] = clamp(self.style[key] + delta)
+
+        return self.style.copy()
+
+    def build_style_prompt(self, style):
+        return (
+            "Current comedy style parameters, each from 0.0 to 1.0: "
+            f"boldness={style['boldness']:.2f}, "
+            f"sarcasm={style['sarcasm']:.2f}, "
+            f"self_deprecation={style['self_deprecation']:.2f}, "
+            f"response_length={style['response_length']:.2f}. "
+            "Use boldness to decide how direct or risky the joke feels. "
+            "Use sarcasm to decide how dry and ironic the tone is. "
+            "Use self_deprecation to decide how much the robot makes fun of itself. "
+            "Use response_length to decide whether the answer is very brief or more extended."
         )
 
     def camera_feedback_loop(self):
@@ -240,7 +307,7 @@ class QTChatTerminal:
             if os.path.exists(audio_path):
                 os.remove(audio_path)
 
-    def ask_gpt(self, prompt, audience_feedback):
+    def ask_gpt(self, prompt, audience_feedback, style):
 
         #persona = (
         #    "Act like you are a robot who is a stand-up comedian named Nigel. "
@@ -267,11 +334,13 @@ class QTChatTerminal:
 
         try:
             audience_feedback_prompt = self.build_audience_feedback_prompt(audience_feedback)
+            style_prompt = self.build_style_prompt(style)
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": persona},
                     {"role": "system", "content": audience_feedback_prompt},
+                    {"role": "system", "content": style_prompt},
                     {"role": "user", "content": prompt}
                     
                 ]
@@ -296,6 +365,7 @@ class QTChatTerminal:
                 continue
 
             audience_feedback = self.summarize_and_reset_smile_feedback()
+            style = self.update_style_from_feedback(audience_feedback)
             print(
                 "feedback: "
                 f"face_seen={audience_feedback['face_seen']}, "
@@ -304,9 +374,16 @@ class QTChatTerminal:
                 f"max={audience_feedback['max_smile']:.2f}, "
                 f"mood={audience_feedback['mood']}"
             )
+            print(
+                "style: "
+                f"boldness={style['boldness']:.2f}, "
+                f"sarcasm={style['sarcasm']:.2f}, "
+                f"self_deprecation={style['self_deprecation']:.2f}, "
+                f"response_length={style['response_length']:.2f}"
+            )
 
             # GPTに返答をもらう
-            gpt_response = self.ask_gpt(user_input, audience_feedback)
+            gpt_response = self.ask_gpt(user_input, audience_feedback, style)
             print(f"answer: {gpt_response}")
 
             self.play_gesture("QT/happy")
