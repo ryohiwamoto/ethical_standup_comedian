@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import cv2
 import mediapipe as mp
 import os
+import random
 import threading
 import wave
 import tempfile
@@ -25,6 +26,37 @@ RATE = 16000
 AUDIO_WIDTH = 2
 SMILE_HIGH_THRESHOLD = 0.65
 SMILE_LOW_THRESHOLD = 0.35
+STYLE_BASELINE = 0.45
+CALIBRATION_DELTA = 0.25
+ONLINE_DELTA_START = 0.08
+ONLINE_DELTA_MIN = 0.02
+ONLINE_DELTA_DECAY = 0.95
+EPSILON_START = 0.30
+EPSILON_MIN = 0.05
+EPSILON_DECAY = 0.95
+Q_LEARNING_RATE = 0.20
+
+STYLE_KEYS = (
+    "boldness",
+    "sarcasm",
+    "self_deprecation",
+)
+
+CALIBRATION_ACTIONS = (
+    "boldness_up",
+    "sarcasm_up",
+    "self_deprecation_up",
+)
+
+ADAPTATION_ACTIONS = (
+    "boldness_up",
+    "boldness_down",
+    "sarcasm_up",
+    "sarcasm_down",
+    "self_deprecation_up",
+    "self_deprecation_down",
+    "keep_current",
+)
 
 
 def clamp(value):
@@ -68,12 +100,14 @@ class QTChatTerminal:
         self.face_seen = False
         self.current_smile = 0.0
         self.smile_history = []
-        self.style = {
-            "boldness": 0.50,
-            "sarcasm": 0.60,
-            "self_deprecation": 0.60,
-            "response_length": 0.35,
-        }
+        self.style = {key: STYLE_BASELINE for key in STYLE_KEYS}
+        self.q_values = {action: 0.50 for action in ADAPTATION_ACTIONS}
+        self.calibration_turn = 0
+        self.previous_action = None
+        self.previous_action_phase = None
+        self.online_turn = 0
+        self.epsilon = EPSILON_START
+        self.online_delta = ONLINE_DELTA_START
         self.feedback_lock = threading.Lock()
         
         self.speech_pub = rospy.Publisher('/qt_robot/speech/say', String, queue_size=10)
@@ -153,47 +187,106 @@ class QTChatTerminal:
             "If mood is no_audience_detected, make a short robot-like aside."
         )
 
-    def update_style_from_feedback(self, feedback):
-        mood = feedback["mood"]
+    def calculate_reward(self, feedback):
+        if not feedback["face_seen"] and feedback["max_smile"] == 0.0:
+            return 0.0
 
-        if mood == "sustained_smiling":
-            deltas = {
-                "boldness": 0.10,
-                "sarcasm": 0.05,
-                "self_deprecation": -0.05,
-                "response_length": 0.05,
-            }
-        elif mood == "brief_smile":
-            deltas = {
-                "boldness": 0.05,
-                "sarcasm": 0.02,
-                "self_deprecation": 0.00,
-                "response_length": 0.00,
-            }
-        elif mood == "not_smiling":
-            deltas = {
-                "boldness": -0.10,
-                "sarcasm": -0.05,
-                "self_deprecation": 0.10,
-                "response_length": -0.10,
-            }
-        elif mood == "no_audience_detected":
-            deltas = {
-                "boldness": -0.05,
-                "sarcasm": 0.00,
-                "self_deprecation": 0.05,
-                "response_length": -0.15,
-            }
+        return clamp(
+            0.60 * feedback["average_smile"]
+            + 0.40 * feedback["max_smile"]
+        )
+
+    def update_previous_action_value(self, reward):
+        if self.previous_action is None:
+            return
+
+        if self.previous_action_phase == "crowdwork_calibration":
+            self.q_values[self.previous_action] = reward
+
+            if self.calibration_turn == len(CALIBRATION_ACTIONS):
+                calibration_scores = [
+                    self.q_values[action] for action in CALIBRATION_ACTIONS
+                ]
+                self.q_values["keep_current"] = (
+                    sum(calibration_scores) / len(calibration_scores)
+                )
         else:
-            deltas = {
-                "boldness": 0.00,
-                "sarcasm": 0.00,
-                "self_deprecation": 0.00,
-                "response_length": 0.00,
-            }
+            old_q = self.q_values[self.previous_action]
+            self.q_values[self.previous_action] = (
+                old_q + Q_LEARNING_RATE * (reward - old_q)
+            )
 
-        for key, delta in deltas.items():
-            self.style[key] = clamp(self.style[key] + delta)
+        print(
+            f"learning: action={self.previous_action}, "
+            f"reward={reward:.3f}, "
+            f"q={self.q_values[self.previous_action]:.3f}"
+        )
+
+    def choose_online_action(self):
+        if random.random() < self.epsilon:
+            action = random.choice(ADAPTATION_ACTIONS)
+            selection_mode = "exploration"
+        else:
+            best_q = max(self.q_values.values())
+            best_actions = [
+                action
+                for action, value in self.q_values.items()
+                if value == best_q
+            ]
+            action = random.choice(best_actions)
+            selection_mode = "exploitation"
+
+        print(
+            f"policy: mode={selection_mode}, action={action}, "
+            f"epsilon={self.epsilon:.3f}, delta={self.online_delta:.3f}"
+        )
+        return action
+
+    def apply_style_action(self, action, delta):
+        if action == "keep_current":
+            return
+
+        style_name, direction = action.rsplit("_", 1)
+        signed_delta = delta if direction == "up" else -delta
+        self.style[style_name] = clamp(
+            self.style[style_name] + signed_delta
+        )
+
+    def select_next_style(self, feedback):
+        reward = self.calculate_reward(feedback)
+        self.update_previous_action_value(reward)
+
+        if self.calibration_turn < len(CALIBRATION_ACTIONS):
+            action = CALIBRATION_ACTIONS[self.calibration_turn]
+            self.style = {key: STYLE_BASELINE for key in STYLE_KEYS}
+            self.apply_style_action(action, CALIBRATION_DELTA)
+            self.calibration_turn += 1
+            phase = "crowdwork_calibration"
+        else:
+            action = self.choose_online_action()
+            self.apply_style_action(action, self.online_delta)
+            self.online_turn += 1
+            self.epsilon = max(
+                EPSILON_MIN,
+                self.epsilon * EPSILON_DECAY
+            )
+            self.online_delta = max(
+                ONLINE_DELTA_MIN,
+                self.online_delta * ONLINE_DELTA_DECAY
+            )
+            phase = "online_adaptation"
+
+        self.previous_action = action
+        self.previous_action_phase = phase
+
+        print(f"adaptation phase: {phase}")
+        print(
+            "Q values: "
+            + ", ".join(
+                f"{action_name}={value:.3f}"
+                for action_name, value in self.q_values.items()
+            )
+        )
 
         return self.style.copy()
 
@@ -202,12 +295,10 @@ class QTChatTerminal:
             "Current comedy style parameters, each from 0.0 to 1.0: "
             f"boldness={style['boldness']:.2f}, "
             f"sarcasm={style['sarcasm']:.2f}, "
-            f"self_deprecation={style['self_deprecation']:.2f}, "
-            f"response_length={style['response_length']:.2f}. "
+            f"self_deprecation={style['self_deprecation']:.2f}. "
             "Use boldness to decide how direct or risky the joke feels. "
             "Use sarcasm to decide how dry and ironic the tone is. "
-            "Use self_deprecation to decide how much the robot makes fun of itself. "
-            "Use response_length to decide whether the answer is very brief or more extended."
+            "Use self_deprecation to decide how much the robot makes fun of itself."
         )
 
     def camera_feedback_loop(self):
@@ -390,7 +481,7 @@ class QTChatTerminal:
                 continue
 
             audience_feedback = self.summarize_and_reset_smile_feedback()
-            style = self.update_style_from_feedback(audience_feedback)
+            style = self.select_next_style(audience_feedback)
             print(
                 "feedback: "
                 f"face_seen={audience_feedback['face_seen']}, "
@@ -403,8 +494,7 @@ class QTChatTerminal:
                 "style: "
                 f"boldness={style['boldness']:.2f}, "
                 f"sarcasm={style['sarcasm']:.2f}, "
-                f"self_deprecation={style['self_deprecation']:.2f}, "
-                f"response_length={style['response_length']:.2f}"
+                f"self_deprecation={style['self_deprecation']:.2f}"
             )
 
             # GPTに返答をもらう
