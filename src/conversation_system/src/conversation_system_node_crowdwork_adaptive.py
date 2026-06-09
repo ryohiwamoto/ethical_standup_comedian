@@ -105,12 +105,15 @@ class QTChatTerminal:
         self.face_seen = False
         self.current_smile = 0.0
         self.smile_history = []
+        self.reaction_frame_count = 0
         self.is_collecting_reaction = False
         self.style = {key: STYLE_BASELINE for key in STYLE_KEYS}
-        self.q_values = {action: 0.50 for action in ADAPTATION_ACTIONS}
+        self.q_values = {action: None for action in ADAPTATION_ACTIONS}
         self.calibration_turn = 0
+        self.calibration_completed = False
         self.previous_action = None
         self.previous_action_phase = None
+        self.style_before_action = self.style.copy()
         self.online_turn = 0
         self.epsilon = EPSILON_START
         self.online_delta = ONLINE_DELTA_START
@@ -143,6 +146,7 @@ class QTChatTerminal:
             if not self.is_collecting_reaction:
                 return
 
+            self.reaction_frame_count += 1
             self.face_seen = face_seen
             self.current_smile = smile_score
             if face_seen:
@@ -153,6 +157,7 @@ class QTChatTerminal:
             self.face_seen = False
             self.current_smile = 0.0
             self.smile_history = []
+            self.reaction_frame_count = 0
             self.is_collecting_reaction = True
 
     def stop_reaction_collection(self):
@@ -172,6 +177,7 @@ class QTChatTerminal:
             face_seen = self.face_seen
             current_smile = self.current_smile
             history = self.smile_history[:]
+            frame_count = self.reaction_frame_count
             self.smile_history = []
 
         if history:
@@ -185,7 +191,11 @@ class QTChatTerminal:
             max_smile = 0.0
             peak_smile = 0.0
 
-        if not face_seen and not history:
+        face_observed = bool(history)
+
+        if frame_count == 0:
+            mood = "camera_unavailable"
+        elif not face_observed:
             mood = "no_audience_detected"
         elif max_smile >= SMILE_HIGH_THRESHOLD and average_smile >= 0.5:
             mood = "sustained_smiling"
@@ -197,7 +207,8 @@ class QTChatTerminal:
             mood = "neutral"
 
         return {
-            "face_seen": face_seen,
+            "face_seen": face_observed,
+            "frame_count": frame_count,
             "current_smile": current_smile,
             "average_smile": average_smile,
             "max_smile": max_smile,
@@ -209,6 +220,7 @@ class QTChatTerminal:
         return (
             "Audience feedback since the previous robot utterance: "
             f"face_seen={feedback['face_seen']}, "
+            f"frame_count={feedback['frame_count']}, "
             f"current_smile={feedback['current_smile']:.2f}, "
             f"average_smile={feedback['average_smile']:.2f}, "
             f"max_smile={feedback['max_smile']:.2f}, "
@@ -222,8 +234,11 @@ class QTChatTerminal:
         )
 
     def calculate_reward(self, feedback):
-        if not feedback["face_seen"] and feedback["max_smile"] == 0.0:
-            return 0.0
+        if feedback["frame_count"] == 0:
+            return None
+
+        if not feedback["face_seen"]:
+            return None
 
         return clamp(
             0.30 * feedback["average_smile"]
@@ -232,7 +247,21 @@ class QTChatTerminal:
 
     def update_previous_action_value(self, reward):
         if self.previous_action is None:
-            return
+            return True
+
+        if reward is None:
+            print(
+                f"learning skipped: action={self.previous_action}, "
+                "reason=audience reaction unavailable"
+            )
+            self.style = self.style_before_action.copy()
+
+            if self.previous_action_phase == "crowdwork_calibration":
+                self.calibration_turn = max(0, self.calibration_turn - 1)
+
+            self.previous_action = None
+            self.previous_action_phase = None
+            return False
 
         if self.previous_action_phase == "crowdwork_calibration":
             self.q_values[self.previous_action] = reward
@@ -246,25 +275,34 @@ class QTChatTerminal:
                 )
         else:
             old_q = self.q_values[self.previous_action]
-            self.q_values[self.previous_action] = (
-                old_q + Q_LEARNING_RATE * (reward - old_q)
-            )
+            if old_q is None:
+                self.q_values[self.previous_action] = reward
+            else:
+                self.q_values[self.previous_action] = (
+                    old_q + Q_LEARNING_RATE * (reward - old_q)
+                )
 
         print(
             f"learning: action={self.previous_action}, "
             f"reward={reward:.3f}, "
             f"q={self.q_values[self.previous_action]:.3f}"
         )
+        return True
 
     def choose_online_action(self):
         if random.random() < self.epsilon:
             action = random.choice(ADAPTATION_ACTIONS)
             selection_mode = "exploration"
         else:
-            best_q = max(self.q_values.values())
+            evaluated_actions = {
+                action: value
+                for action, value in self.q_values.items()
+                if value is not None
+            }
+            best_q = max(evaluated_actions.values())
             best_actions = [
                 action
-                for action, value in self.q_values.items()
+                for action, value in evaluated_actions.items()
                 if value == best_q
             ]
             action = random.choice(best_actions)
@@ -293,11 +331,18 @@ class QTChatTerminal:
         if self.calibration_turn < len(CALIBRATION_ACTIONS):
             action = CALIBRATION_ACTIONS[self.calibration_turn]
             self.style = {key: STYLE_BASELINE for key in STYLE_KEYS}
+            self.style_before_action = self.style.copy()
             self.apply_style_action(action, CALIBRATION_DELTA)
             self.calibration_turn += 1
             phase = "crowdwork_calibration"
         else:
+            if not self.calibration_completed:
+                self.style = {key: STYLE_BASELINE for key in STYLE_KEYS}
+                self.calibration_completed = True
+                print("calibration complete: style reset to baseline")
+
             action = self.choose_online_action()
+            self.style_before_action = self.style.copy()
             self.apply_style_action(action, self.online_delta)
             self.online_turn += 1
             self.epsilon = max(
@@ -317,12 +362,32 @@ class QTChatTerminal:
         print(
             "Q values: "
             + ", ".join(
-                f"{action_name}={value:.3f}"
+                (
+                    f"{action_name}={value:.3f}"
+                    if value is not None
+                    else f"{action_name}=unobserved"
+                )
                 for action_name, value in self.q_values.items()
             )
         )
 
         return self.style.copy()
+
+    def discard_pending_action(self, reason):
+        if self.previous_action is None:
+            return
+
+        print(
+            f"learning skipped: action={self.previous_action}, "
+            f"reason={reason}"
+        )
+        self.style = self.style_before_action.copy()
+
+        if self.previous_action_phase == "crowdwork_calibration":
+            self.calibration_turn = max(0, self.calibration_turn - 1)
+
+        self.previous_action = None
+        self.previous_action_phase = None
 
     def build_style_prompt(self, style):
         return (
@@ -519,6 +584,7 @@ class QTChatTerminal:
             print(
                 "feedback: "
                 f"face_seen={audience_feedback['face_seen']}, "
+                f"frames={audience_feedback['frame_count']}, "
                 f"current={audience_feedback['current_smile']:.2f}, "
                 f"avg={audience_feedback['average_smile']:.2f}, "
                 f"max={audience_feedback['max_smile']:.2f}, "
@@ -537,6 +603,7 @@ class QTChatTerminal:
             print(f"answer: {gpt_response}")
 
             if self.is_output_flagged(gpt_response):
+                self.discard_pending_action("moderation_block")
                 self.play_gesture("QT/happy")
                 continue
 
