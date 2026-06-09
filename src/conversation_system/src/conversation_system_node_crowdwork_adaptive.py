@@ -6,6 +6,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import cv2
 import mediapipe as mp
+import math
 import os
 import random
 import threading
@@ -35,6 +36,10 @@ EPSILON_START = 0.30
 EPSILON_MIN = 0.05
 EPSILON_DECAY = 0.95
 Q_LEARNING_RATE = 0.20
+POST_SPEECH_REACTION_SECONDS = 3.0
+ESTIMATED_WORDS_PER_SECOND = 2.5
+MIN_ESTIMATED_SPEECH_SECONDS = 1.0
+MAX_ESTIMATED_SPEECH_SECONDS = 20.0
 
 STYLE_KEYS = (
     "boldness",
@@ -100,6 +105,7 @@ class QTChatTerminal:
         self.face_seen = False
         self.current_smile = 0.0
         self.smile_history = []
+        self.is_collecting_reaction = False
         self.style = {key: STYLE_BASELINE for key in STYLE_KEYS}
         self.q_values = {action: 0.50 for action in ADAPTATION_ACTIONS}
         self.calibration_turn = 0
@@ -134,10 +140,32 @@ class QTChatTerminal:
 
     def update_smile_feedback(self, face_seen, smile_score):
         with self.feedback_lock:
+            if not self.is_collecting_reaction:
+                return
+
             self.face_seen = face_seen
             self.current_smile = smile_score
             if face_seen:
                 self.smile_history.append(smile_score)
+
+    def start_reaction_collection(self):
+        with self.feedback_lock:
+            self.face_seen = False
+            self.current_smile = 0.0
+            self.smile_history = []
+            self.is_collecting_reaction = True
+
+    def stop_reaction_collection(self):
+        with self.feedback_lock:
+            self.is_collecting_reaction = False
+
+    def estimate_speech_duration(self, text):
+        word_count = max(1, len(text.split()))
+        estimated_seconds = word_count / ESTIMATED_WORDS_PER_SECOND
+        return max(
+            MIN_ESTIMATED_SPEECH_SECONDS,
+            min(MAX_ESTIMATED_SPEECH_SECONDS, estimated_seconds)
+        )
 
     def summarize_and_reset_smile_feedback(self):
         with self.feedback_lock:
@@ -149,9 +177,13 @@ class QTChatTerminal:
         if history:
             average_smile = sum(history) / len(history)
             max_smile = max(history)
+            sorted_scores = sorted(history, reverse=True)
+            top_count = max(1, math.ceil(len(sorted_scores) * 0.10))
+            peak_smile = sum(sorted_scores[:top_count]) / top_count
         else:
             average_smile = 0.0
             max_smile = 0.0
+            peak_smile = 0.0
 
         if not face_seen and not history:
             mood = "no_audience_detected"
@@ -169,6 +201,7 @@ class QTChatTerminal:
             "current_smile": current_smile,
             "average_smile": average_smile,
             "max_smile": max_smile,
+            "peak_smile": peak_smile,
             "mood": mood,
         }
 
@@ -179,6 +212,7 @@ class QTChatTerminal:
             f"current_smile={feedback['current_smile']:.2f}, "
             f"average_smile={feedback['average_smile']:.2f}, "
             f"max_smile={feedback['max_smile']:.2f}, "
+            f"peak_smile={feedback['peak_smile']:.2f}, "
             f"mood={feedback['mood']}. "
             "Use this feedback to adapt the next response. "
             "If mood is sustained_smiling, continue the current comedic style. "
@@ -192,8 +226,8 @@ class QTChatTerminal:
             return 0.0
 
         return clamp(
-            0.60 * feedback["average_smile"]
-            + 0.40 * feedback["max_smile"]
+            0.30 * feedback["average_smile"]
+            + 0.70 * feedback["peak_smile"]
         )
 
     def update_previous_action_value(self, reward):
@@ -488,6 +522,7 @@ class QTChatTerminal:
                 f"current={audience_feedback['current_smile']:.2f}, "
                 f"avg={audience_feedback['average_smile']:.2f}, "
                 f"max={audience_feedback['max_smile']:.2f}, "
+                f"peak={audience_feedback['peak_smile']:.2f}, "
                 f"mood={audience_feedback['mood']}"
             )
             print(
@@ -508,9 +543,21 @@ class QTChatTerminal:
             self.play_gesture("QT/happy")
 
             # QTrobotに喋らせる
+            self.start_reaction_collection()
             msg = String()
             msg.data = gpt_response
             self.speech_pub.publish(msg)
+
+            estimated_speech_seconds = self.estimate_speech_duration(gpt_response)
+            print(
+                "reaction window: "
+                f"estimated speech={estimated_speech_seconds:.1f}s "
+                f"+ post-speech={POST_SPEECH_REACTION_SECONDS:.1f}s"
+            )
+            rospy.sleep(
+                estimated_speech_seconds + POST_SPEECH_REACTION_SECONDS
+            )
+            self.stop_reaction_collection()
 
 if __name__ == '__main__':
     try:
