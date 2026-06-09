@@ -604,10 +604,15 @@ class QTChatTerminal:
 
             if self.is_output_flagged(gpt_response):
                 self.discard_pending_action("moderation_block")
-                self.play_gesture("QT/happy")
+                rospy.sleep(1.0)
+                self.play_gesture("QT/bored")
+                refusal_msg = String()
+                refusal_msg.data = "That joke was removed by my ethics module."
+                self.speech_pub.publish(refusal_msg)
+                rospy.sleep(1.0)
                 continue
 
-            self.play_gesture("QT/happy")
+            self.play_gesture("QT/hi")
 
             # QTrobotに喋らせる
             self.start_reaction_collection()
