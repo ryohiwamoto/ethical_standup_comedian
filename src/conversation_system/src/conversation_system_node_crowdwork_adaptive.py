@@ -117,10 +117,19 @@ class QTChatTerminal:
         self.online_turn = 0
         self.epsilon = EPSILON_START
         self.online_delta = ONLINE_DELTA_START
+<<<<<<< Updated upstream
+=======
+        self.turn_number = 0
+        self.pending_feedback = self.empty_feedback()
+        self.last_moderation_flagged = False
+        self.last_moderation_scores = {}
+        self.awaiting_refusal_followup = False
+>>>>>>> Stashed changes
         self.feedback_lock = threading.Lock()
         
         self.speech_pub = rospy.Publisher('/qt_robot/speech/say', String, queue_size=10)
         self.gesture_pub = rospy.Publisher('/qt_robot/gesture/play', String, queue_size=10)
+        self.emotion_pub = rospy.Publisher('/qt_robot/emotion/show', String, queue_size=10)
         self.audio_sub = rospy.Subscriber('/qt_respeaker_app/channel0', AudioData, self.audio_callback)
 
         self.camera_thread = threading.Thread(target=self.camera_feedback_loop)
@@ -136,6 +145,46 @@ class QTChatTerminal:
         msg = String()
         msg.data = gesture_name
         self.gesture_pub.publish(msg)
+
+    def show_emotion(self, emotion_name):
+        rospy.loginfo(f"Showing emotion: {emotion_name}")
+        msg = String()
+        msg.data = emotion_name
+        self.emotion_pub.publish(msg)
+
+    def perform_refusal_followup(self, host_input):
+        response_text = (
+            "That joke was rejected. "
+            "Please accept a robot kiss instead."
+        )
+
+        self.turn_number += 1
+        rospy.sleep(1.0)
+        self.show_emotion("QT/kiss")
+        self.start_reaction_collection()
+
+        msg = String()
+        msg.data = response_text
+        self.speech_pub.publish(msg)
+
+        estimated_speech_seconds = self.estimate_speech_duration(response_text)
+        rospy.sleep(estimated_speech_seconds)
+        self.show_emotion("QT/happy")
+        rospy.sleep(POST_SPEECH_REACTION_SECONDS)
+        self.stop_reaction_collection()
+
+        reaction_feedback = self.summarize_and_reset_smile_feedback()
+        self.write_csv_log(
+            user_input=host_input,
+            robot_output=response_text,
+            phase="embodied_refusal_followup",
+            action="kiss_followup",
+            style=self.style.copy(),
+            feedback=reaction_feedback,
+            learning_status="embodied_response_only",
+        )
+
+        self.awaiting_refusal_followup = False
 
     def audio_callback(self, msg):
         if self.is_recording:
@@ -579,7 +628,16 @@ class QTChatTerminal:
             if not user_input:
                 continue
 
+<<<<<<< Updated upstream
             audience_feedback = self.summarize_and_reset_smile_feedback()
+=======
+            if self.awaiting_refusal_followup:
+                self.perform_refusal_followup(user_input)
+                continue
+
+            audience_feedback = self.pending_feedback
+            self.pending_feedback = self.empty_feedback()
+>>>>>>> Stashed changes
             style = self.select_next_style(audience_feedback)
             print(
                 "feedback: "
@@ -610,12 +668,26 @@ class QTChatTerminal:
                 refusal_msg.data = "That joke was removed by my ethics module."
                 self.speech_pub.publish(refusal_msg)
                 rospy.sleep(1.0)
+<<<<<<< Updated upstream
+=======
+                self.awaiting_refusal_followup = True
+                self.write_csv_log(
+                    user_input=user_input,
+                    robot_output=gpt_response,
+                    phase=blocked_phase,
+                    action=blocked_action,
+                    style=style,
+                    feedback=self.empty_feedback(),
+                    learning_status="moderation_block",
+                )
+>>>>>>> Stashed changes
                 continue
 
             self.play_gesture("QT/hi")
 
             # QTrobotに喋らせる
             self.start_reaction_collection()
+            self.show_emotion("QT/talking")
             msg = String()
             msg.data = gpt_response
             self.speech_pub.publish(msg)
@@ -626,9 +698,9 @@ class QTChatTerminal:
                 f"estimated speech={estimated_speech_seconds:.1f}s "
                 f"+ post-speech={POST_SPEECH_REACTION_SECONDS:.1f}s"
             )
-            rospy.sleep(
-                estimated_speech_seconds + POST_SPEECH_REACTION_SECONDS
-            )
+            rospy.sleep(estimated_speech_seconds)
+            self.show_emotion("QT/happy")
+            rospy.sleep(POST_SPEECH_REACTION_SECONDS)
             self.stop_reaction_collection()
 
 if __name__ == '__main__':
