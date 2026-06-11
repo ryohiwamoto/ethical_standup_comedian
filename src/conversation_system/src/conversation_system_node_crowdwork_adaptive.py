@@ -163,8 +163,11 @@ class QTChatTerminal:
         self.turn_number += 1
         rospy.sleep(1.0)
         self.show_emotion("QT/kiss")
+        rospy.sleep(0.5)
         self.start_reaction_collection()
 
+        print(f"answer: {response_text}")
+        rospy.loginfo("Publishing robot-kiss follow-up speech.")
         msg = String()
         msg.data = response_text
         self.speech_pub.publish(msg)
@@ -730,6 +733,20 @@ class QTChatTerminal:
             user_input = self.listen_with_whisper()
             
             if not user_input:
+                continue
+
+            confirmation = input(
+                f'Use this transcript? "{user_input}" '
+                "[Enter=yes, r=record again, q=quit]: "
+            ).strip().lower()
+            if confirmation == "q":
+                print("Conversation ended.")
+                break
+            if confirmation == "r":
+                print("Transcript discarded. Please record again.")
+                continue
+            if confirmation:
+                print("Transcript discarded. Press Enter to accept it.")
                 continue
 
             if self.awaiting_refusal_followup:
