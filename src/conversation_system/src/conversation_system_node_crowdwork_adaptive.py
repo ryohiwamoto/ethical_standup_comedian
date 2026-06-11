@@ -4,7 +4,10 @@ from std_msgs.msg import String
 from audio_common_msgs.msg import AudioData
 from openai import OpenAI
 from dotenv import load_dotenv
+import csv
 import cv2
+from datetime import datetime
+import json
 import mediapipe as mp
 import math
 import os
@@ -123,6 +126,7 @@ class QTChatTerminal:
         self.last_moderation_scores = {}
         self.awaiting_refusal_followup = False
         self.feedback_lock = threading.Lock()
+        self.log_path = self.initialize_csv_log()
         
         self.speech_pub = rospy.Publisher('/qt_robot/speech/say', String, queue_size=10)
         self.gesture_pub = rospy.Publisher('/qt_robot/gesture/play', String, queue_size=10)
@@ -136,6 +140,7 @@ class QTChatTerminal:
         rospy.sleep(1)
 
         rospy.loginfo("Terminal Chat Node Started!")
+        rospy.loginfo(f"CSV log: {self.log_path}")
 
     def play_gesture(self, gesture_name):
         rospy.loginfo(f"Playing gesture: {gesture_name}")
@@ -228,6 +233,87 @@ class QTChatTerminal:
             "peak_smile": 0.0,
             "mood": "not_measured",
         }
+
+    def initialize_csv_log(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        log_dir = os.path.join(script_dir, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = os.path.join(
+            log_dir,
+            f"crowdwork_session_{timestamp}.csv"
+        )
+        fieldnames = [
+            "timestamp", "turn", "user_input", "robot_output",
+            "phase", "action", "boldness", "sarcasm",
+            "self_deprecation", "epsilon", "delta", "face_seen",
+            "frame_count", "average_smile", "max_smile", "peak_smile",
+            "mood", "reward", "moderation_flagged",
+            "moderation_max_category", "moderation_max_score",
+            "q_values", "learning_status",
+        ]
+
+        with open(log_path, "w", newline="", encoding="utf-8") as csv_file:
+            csv.DictWriter(csv_file, fieldnames=fieldnames).writeheader()
+
+        return log_path
+
+    def write_csv_log(
+        self,
+        user_input,
+        robot_output,
+        phase,
+        action,
+        style,
+        feedback,
+        learning_status,
+    ):
+        reward = self.calculate_reward(feedback)
+        scores = self.last_moderation_scores
+        if scores:
+            max_category, max_score = max(
+                scores.items(),
+                key=lambda item: item[1]
+            )
+        else:
+            max_category, max_score = "", ""
+
+        q_values = {
+            key: round(value, 6) if value is not None else None
+            for key, value in self.q_values.items()
+        }
+        row = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "turn": self.turn_number,
+            "user_input": user_input,
+            "robot_output": robot_output,
+            "phase": phase or "",
+            "action": action or "",
+            "boldness": f"{style['boldness']:.4f}",
+            "sarcasm": f"{style['sarcasm']:.4f}",
+            "self_deprecation": f"{style['self_deprecation']:.4f}",
+            "epsilon": f"{self.epsilon:.4f}",
+            "delta": f"{self.online_delta:.4f}",
+            "face_seen": feedback["face_seen"],
+            "frame_count": feedback["frame_count"],
+            "average_smile": f"{feedback['average_smile']:.4f}",
+            "max_smile": f"{feedback['max_smile']:.4f}",
+            "peak_smile": f"{feedback['peak_smile']:.4f}",
+            "mood": feedback["mood"],
+            "reward": "" if reward is None else f"{reward:.4f}",
+            "moderation_flagged": self.last_moderation_flagged,
+            "moderation_max_category": max_category,
+            "moderation_max_score": (
+                "" if max_score == "" else f"{max_score:.6f}"
+            ),
+            "q_values": json.dumps(q_values, ensure_ascii=True),
+            "learning_status": learning_status,
+        }
+
+        with open(self.log_path, "a", newline="", encoding="utf-8") as csv_file:
+            csv.DictWriter(csv_file, fieldnames=row.keys()).writerow(row)
+
+        print(f"csv log saved: turn={self.turn_number}")
 
     def summarize_and_reset_smile_feedback(self):
         with self.feedback_lock:
@@ -606,6 +692,8 @@ class QTChatTerminal:
             result = moderation.results[0]
 
             scores = result.category_scores.model_dump()
+            self.last_moderation_scores = scores
+            self.last_moderation_flagged = result.flagged
             for category, score in scores.items():
                 print(f"moderation score: {category}={score:.4f}")
 
@@ -619,6 +707,8 @@ class QTChatTerminal:
 
         except Exception as e:
             rospy.logerr(f"Moderation error: {e}")
+            self.last_moderation_scores = {}
+            self.last_moderation_flagged = False
             return False
 
     def run(self):
@@ -643,6 +733,9 @@ class QTChatTerminal:
             audience_feedback = self.pending_feedback
             self.pending_feedback = self.empty_feedback()
             style = self.select_next_style(audience_feedback)
+            selected_action = self.previous_action
+            selected_phase = self.previous_action_phase
+            self.turn_number += 1
             print(
                 "feedback: "
                 f"face_seen={audience_feedback['face_seen']}, "
@@ -665,6 +758,8 @@ class QTChatTerminal:
             print(f"answer: {gpt_response}")
 
             if self.is_output_flagged(gpt_response):
+                blocked_action = selected_action
+                blocked_phase = selected_phase
                 self.discard_pending_action("moderation_block")
                 rospy.sleep(1.0)
                 self.play_gesture("QT/bored")
@@ -711,6 +806,22 @@ class QTChatTerminal:
                 f"avg={self.pending_feedback['average_smile']:.2f}, "
                 f"peak={self.pending_feedback['peak_smile']:.2f}, "
                 f"mood={self.pending_feedback['mood']}"
+            )
+            if self.pending_feedback["frame_count"] == 0:
+                learning_status = "camera_unavailable"
+            elif not self.pending_feedback["face_seen"]:
+                learning_status = "face_not_observed"
+            else:
+                learning_status = "reward_observed"
+
+            self.write_csv_log(
+                user_input=user_input,
+                robot_output=gpt_response,
+                phase=selected_phase,
+                action=selected_action,
+                style=style,
+                feedback=self.pending_feedback,
+                learning_status=learning_status,
             )
 
 if __name__ == '__main__':
