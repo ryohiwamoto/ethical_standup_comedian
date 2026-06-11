@@ -218,6 +218,17 @@ class QTChatTerminal:
             min(MAX_ESTIMATED_SPEECH_SECONDS, estimated_seconds)
         )
 
+    def empty_feedback(self):
+        return {
+            "face_seen": False,
+            "frame_count": 0,
+            "current_smile": 0.0,
+            "average_smile": 0.0,
+            "max_smile": 0.0,
+            "peak_smile": 0.0,
+            "mood": "not_measured",
+        }
+
     def summarize_and_reset_smile_feedback(self):
         with self.feedback_lock:
             face_seen = self.face_seen
