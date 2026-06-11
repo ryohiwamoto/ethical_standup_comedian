@@ -703,6 +703,15 @@ class QTChatTerminal:
             self.show_emotion("QT/happy")
             rospy.sleep(POST_SPEECH_REACTION_SECONDS)
             self.stop_reaction_collection()
+            self.pending_feedback = self.summarize_and_reset_smile_feedback()
+            print(
+                "reaction captured: "
+                f"face_seen={self.pending_feedback['face_seen']}, "
+                f"frames={self.pending_feedback['frame_count']}, "
+                f"avg={self.pending_feedback['average_smile']:.2f}, "
+                f"peak={self.pending_feedback['peak_smile']:.2f}, "
+                f"mood={self.pending_feedback['mood']}"
+            )
 
 if __name__ == '__main__':
     try:
