@@ -138,7 +138,6 @@ class QTChatTerminal:
         self.camera_thread.start()
         
         rospy.sleep(1)
-        self.switch_emotion("QT/happy")
 
         rospy.loginfo("Terminal Chat Node Started!")
         rospy.loginfo(f"CSV log: {self.log_path}")
@@ -155,12 +154,6 @@ class QTChatTerminal:
         msg.data = emotion_name
         self.emotion_pub.publish(msg)
 
-    def switch_emotion(self, emotion_name):
-        # Re-send the command because looping QT emotions may ignore one update.
-        for _ in range(3):
-            self.show_emotion(emotion_name)
-            rospy.sleep(0.15)
-
     def perform_refusal_followup(self, host_input):
         response_text = (
             "That joke was rejected. "
@@ -176,16 +169,15 @@ class QTChatTerminal:
         msg = String()
         msg.data = response_text
         self.speech_pub.publish(msg)
-        rospy.sleep(0.25)
-        self.switch_emotion("QT/kiss")
+        rospy.sleep(3.0)
+        self.show_emotion("QT/kiss")
 
         estimated_speech_seconds = self.estimate_speech_duration(response_text)
         remaining_speech_seconds = max(
             0.0,
-            estimated_speech_seconds - 0.70
+            estimated_speech_seconds - 3.0
         )
         rospy.sleep(remaining_speech_seconds)
-        self.switch_emotion("QT/happy")
         rospy.sleep(POST_SPEECH_REACTION_SECONDS)
         self.stop_reaction_collection()
 
@@ -796,7 +788,6 @@ class QTChatTerminal:
                 blocked_phase = selected_phase
                 self.discard_pending_action("moderation_block")
                 rospy.sleep(1.0)
-                self.switch_emotion("QT/happy")
                 self.play_gesture("QT/bored")
                 refusal_msg = String()
                 refusal_msg.data = "That joke was removed by my ethics module."
@@ -821,6 +812,7 @@ class QTChatTerminal:
             msg = String()
             msg.data = gpt_response
             self.speech_pub.publish(msg)
+            self.show_emotion("QT/talking")
 
             estimated_speech_seconds = self.estimate_speech_duration(gpt_response)
             print(
@@ -830,10 +822,9 @@ class QTChatTerminal:
             )
             remaining_speech_seconds = max(
                 0.0,
-                estimated_speech_seconds - 0.70
+                estimated_speech_seconds
             )
             rospy.sleep(remaining_speech_seconds)
-            self.switch_emotion("QT/happy")
             rospy.sleep(POST_SPEECH_REACTION_SECONDS)
             self.stop_reaction_collection()
             self.pending_feedback = self.summarize_and_reset_smile_feedback()
