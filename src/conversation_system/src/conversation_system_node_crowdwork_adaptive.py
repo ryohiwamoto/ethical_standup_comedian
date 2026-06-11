@@ -718,7 +718,13 @@ class QTChatTerminal:
         print("---------------------------------------")
         
         while not rospy.is_shutdown():
-            input("Press Enter and speak...")
+            command = input("Type r and press Enter to speak (q to quit): ")
+            if command.strip().lower() == "q":
+                print("Conversation ended.")
+                break
+            if command.strip().lower() != "r":
+                print("Ignored input. Type r to start recording.")
+                continue
 
             # マイクから入力を受け取り、Whisperで文字起こしする
             user_input = self.listen_with_whisper()
