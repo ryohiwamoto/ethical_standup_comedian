@@ -138,6 +138,7 @@ class QTChatTerminal:
         self.camera_thread.start()
         
         rospy.sleep(1)
+        self.switch_emotion("QT/happy")
 
         rospy.loginfo("Terminal Chat Node Started!")
         rospy.loginfo(f"CSV log: {self.log_path}")
@@ -820,8 +821,6 @@ class QTChatTerminal:
             msg = String()
             msg.data = gpt_response
             self.speech_pub.publish(msg)
-            rospy.sleep(0.25)
-            self.switch_emotion("QT/talking")
 
             estimated_speech_seconds = self.estimate_speech_duration(gpt_response)
             print(
