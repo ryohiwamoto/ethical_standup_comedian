@@ -117,14 +117,11 @@ class QTChatTerminal:
         self.online_turn = 0
         self.epsilon = EPSILON_START
         self.online_delta = ONLINE_DELTA_START
-<<<<<<< Updated upstream
-=======
         self.turn_number = 0
         self.pending_feedback = self.empty_feedback()
         self.last_moderation_flagged = False
         self.last_moderation_scores = {}
         self.awaiting_refusal_followup = False
->>>>>>> Stashed changes
         self.feedback_lock = threading.Lock()
         
         self.speech_pub = rospy.Publisher('/qt_robot/speech/say', String, queue_size=10)
@@ -628,16 +625,12 @@ class QTChatTerminal:
             if not user_input:
                 continue
 
-<<<<<<< Updated upstream
-            audience_feedback = self.summarize_and_reset_smile_feedback()
-=======
             if self.awaiting_refusal_followup:
                 self.perform_refusal_followup(user_input)
                 continue
 
             audience_feedback = self.pending_feedback
             self.pending_feedback = self.empty_feedback()
->>>>>>> Stashed changes
             style = self.select_next_style(audience_feedback)
             print(
                 "feedback: "
@@ -668,8 +661,6 @@ class QTChatTerminal:
                 refusal_msg.data = "That joke was removed by my ethics module."
                 self.speech_pub.publish(refusal_msg)
                 rospy.sleep(1.0)
-<<<<<<< Updated upstream
-=======
                 self.awaiting_refusal_followup = True
                 self.write_csv_log(
                     user_input=user_input,
@@ -680,7 +671,6 @@ class QTChatTerminal:
                     feedback=self.empty_feedback(),
                     learning_status="moderation_block",
                 )
->>>>>>> Stashed changes
                 continue
 
             self.play_gesture("QT/hi")
