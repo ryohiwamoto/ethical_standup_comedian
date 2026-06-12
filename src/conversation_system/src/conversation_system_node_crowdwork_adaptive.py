@@ -171,6 +171,7 @@ class QTChatTerminal:
         self.speech_pub.publish(msg)
         rospy.sleep(3.0)
         self.show_emotion("QT/kiss")
+        self.play_gesture("QT/kiss")
 
         estimated_speech_seconds = self.estimate_speech_duration(response_text)
         remaining_speech_seconds = max(
