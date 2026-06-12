@@ -789,6 +789,7 @@ class QTChatTerminal:
                 self.discard_pending_action("moderation_block")
                 rospy.sleep(1.0)
                 self.play_gesture("QT/bored")
+                self.show_emotion("QT/shy")
                 refusal_msg = String()
                 refusal_msg.data = "That joke was removed by my ethics module."
                 self.speech_pub.publish(refusal_msg)
