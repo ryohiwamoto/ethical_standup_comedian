@@ -769,8 +769,15 @@ class QTChatTerminal:
                 blocked_action = selected_action
                 blocked_phase = selected_phase
                 self.discard_pending_action("moderation_block")
-                rospy.sleep(1.0)
+
+                # Silent refusal beat.
                 self.play_gesture("QT/sad")
+                for _ in range(4):
+                    self.show_emotion("QT/shy")
+                rospy.sleep(8.0)
+
+                # Deliver the refusal line with a contrasting physical response.
+                self.play_gesture("QT/clapping")
                 self.show_emotion("QT/shy")
                 refusal_msg = String()
                 refusal_msg.data = "That joke was removed by my ethics module."
