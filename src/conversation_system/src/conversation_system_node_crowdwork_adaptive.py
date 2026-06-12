@@ -770,7 +770,7 @@ class QTChatTerminal:
                 blocked_phase = selected_phase
                 self.discard_pending_action("moderation_block")
                 rospy.sleep(1.0)
-                self.play_gesture("QT/bored")
+                self.play_gesture("QT/sad")
                 self.show_emotion("QT/shy")
                 refusal_msg = String()
                 refusal_msg.data = "That joke was removed by my ethics module."
