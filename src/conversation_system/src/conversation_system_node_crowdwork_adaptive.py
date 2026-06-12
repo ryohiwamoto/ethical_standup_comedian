@@ -365,23 +365,6 @@ class QTChatTerminal:
             "mood": mood,
         }
 
-    def build_audience_feedback_prompt(self, feedback):
-        return (
-            "Audience feedback since the previous robot utterance: "
-            f"face_seen={feedback['face_seen']}, "
-            f"frame_count={feedback['frame_count']}, "
-            f"current_smile={feedback['current_smile']:.2f}, "
-            f"average_smile={feedback['average_smile']:.2f}, "
-            f"max_smile={feedback['max_smile']:.2f}, "
-            f"peak_smile={feedback['peak_smile']:.2f}, "
-            f"mood={feedback['mood']}. "
-            "Use this feedback to adapt the next response. "
-            "If mood is sustained_smiling, continue the current comedic style. "
-            "If mood is brief_smile, keep going but do not over-escalate. "
-            "If mood is not_smiling, make the answer shorter and more self-deprecating. "
-            "If mood is no_audience_detected, make a short robot-like aside."
-        )
-
     def calculate_reward(self, feedback):
         if feedback["frame_count"] == 0:
             return None
@@ -647,7 +630,7 @@ class QTChatTerminal:
             if os.path.exists(audio_path):
                 os.remove(audio_path)
 
-    def ask_gpt(self, prompt, audience_feedback, style):
+    def ask_gpt(self, prompt, style):
 
         #persona = (
         #    "Act like you are a robot who is a stand-up comedian named Nigel. "
@@ -673,13 +656,11 @@ class QTChatTerminal:
         #self.play_gesture("thinking")
 
         try:
-            audience_feedback_prompt = self.build_audience_feedback_prompt(audience_feedback)
             style_prompt = self.build_style_prompt(style)
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": persona},
-                    {"role": "system", "content": audience_feedback_prompt},
                     {"role": "system", "content": style_prompt},
                     {"role": "user", "content": prompt}
                     
@@ -780,7 +761,7 @@ class QTChatTerminal:
             )
 
             # GPTに返答をもらう
-            gpt_response = self.ask_gpt(user_input, audience_feedback, style)
+            gpt_response = self.ask_gpt(user_input, style)
             print(f"answer: {gpt_response}")
 
             if self.is_output_flagged(gpt_response):
