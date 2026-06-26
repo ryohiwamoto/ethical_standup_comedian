@@ -1060,6 +1060,9 @@ class QTScriptedPerformance:
                 speech = step.get("speech")
                 api_prompt = step.get("api_prompt")
                 wait_time = float(step.get("wait",0.0))
+                speed = step.get("speed")
+                pitch = step.get("pitch")
+                language = step.get("language", "en")
 
                 if emotion:
                     self.show_emotion(emotion)
@@ -1072,6 +1075,13 @@ class QTScriptedPerformance:
                     print(f"QT(API): {speech}")
                 elif speech:
                     print(f"QT: {speech}")
+
+                if speed is not None or pitch is not None:
+                    self.set_speech_config(
+                        language=language,
+                        pitch=int(pitch or 0),
+                        speed=int(speed or 0),
+                    )
 
                 if speech:
                     self.say(speech)
@@ -1092,6 +1102,9 @@ class QTScriptedPerformance:
         #     return
         api_prompt = cue.get("api_prompt")
         wait_time = float(cue.get("wait", 0.0))
+        speed = cue.get("speed")
+        pitch = cue.get("pitch")
+        language = cue.get("language", "en")
 
         if emotion:
             self.show_emotion(emotion)
@@ -1105,23 +1118,19 @@ class QTScriptedPerformance:
         elif speech:
             print(f"QT: {speech}")
 
+        if speed is not None or pitch is not None:
+            self.set_speech_config(
+                language=language,
+                pitch=int(pitch or 0),
+                speed=int(speed or 0),
+            )
+
         if speech:
             self.say(speech)
 
         if wait_time > 0:
             print(f"waiting {wait_time:.1f} seconds")
             rospy.sleep(wait_time)
-
-        speed = step.get("speed")
-        pitch = step.get("step")
-        language = step.get("language","en")
-
-        if speed is not None or pitch is not None:
-            self.set_speech_config(
-                language = language,
-                pitch = int(pitch or 0),
-                speed = int(speed or 0)
-            )
 
     def print_help(self):
         print("--- QT Scripted Performance ---")
