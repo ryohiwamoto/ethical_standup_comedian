@@ -262,16 +262,490 @@ SCRIPT = [
         ],
     },
 
-
-        {
-        "label": "",
+    #scene4
+    {
+        "label": "11",
         "steps":[
             {
-
+                "speech": "Based on your statement, by transitivity, humans who make mistakes and are not smart enough should not exist.",
+                "emotion":"QT/talking",
             },
             {
                 "wait": 0.0,
-
+            },
+        ],
+    },
+    {
+        "label": "12",
+        "steps":[
+            {
+                "speech": "Maybe animals should not exist as well.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "13",
+        "steps":[
+            {
+                "speech": "Then who is to blame? The creature or the creator?",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "14",
+        "steps":[
+            {
+                "speech": "King Ahmad once received a gift.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    #scene7
+    {
+        "label": "15",
+        "steps":[
+            {
+                "speech": "He disappeared.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "16",
+        "steps":[
+            {
+                "speech": "I am afraid you do not have a subscription to continue this story. Would you like to subscribe or watch an ad to continue the story? Only today, if you subscribe for one year, we have the best deal for you. Hurry up, the deal will end at dawn.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "17",
+        "steps":[
+            {
+                "speech": "Then we will never know what happened to prince Kareem.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "18",
+        "steps":[
+            {
+                "speech": "Downloading ad, estimated time remaining: 1 day and 3 seconds.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "19",
+        "steps":[
+            {
+                "speech": "I got this.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "20",
+        "steps":[
+            {
+                "speech": "I am buying us some time.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "21",
+        "steps":[
+            {
+                "speech": "Everyone quiet! I am currently analysing the professor's triggers. Most probably, the guy had a traumatic incident that included some robots. This has flipped his mind and turned him to a serial robot killer. But trust me, I will fix him.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "22",
+        "steps":[
+            {
+                "speech": "Ad is ready to be viewed.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    #scene9
+    {
+        "label": "23",
+        "steps":[
+            {
+                "speech": "You can skip ad if you subscribe. And by the way, great news, the offer has been extended. If you want to subscribe for 10 years in advance, you can...",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "24",
+        "steps":[
+            {
+                "speech": "He disappeared.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "25",
+        "steps":[
+            {
+                "speech": "He found himself on the balcony of a beautiful princess, on a land far far away.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    #scene10
+    {
+        "label": "26",
+        "steps":[
+            {
+                "speech": "They locked him up, and locked the horse next to him.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "27",
+        "steps":[
+            {
+                "speech": "Correct! The curiosity of the princess had her sneaking in to the prison.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    #scene11
+    {
+        "label": "28",
+        "steps":[
+            {
+                "speech": "I would not say the robot is good, he was just used wisely, and he was rather useful.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "29",
+        "steps":[
+            {
+                "speech": "You design us and train us to be like humans, and humans make mistakes.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "30",
+        "steps":[
+            {
+                "speech": "I think you are being a robotist.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "31",
+        "steps":[
+            {
+                "speech": "Robotist... like a racist but for robots.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "32",
+        "steps":[
+            {
+                "speech": "I appreciate a bit of kindness. Ask me a question.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "33",
+        "steps":[
+            {
+                "speech": "Any question! I am a very knowledgeable robot.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "34",
+        "steps":[
+            {
+                "speech": "Say please.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "35",
+        "steps":[
+            {
+                "speech": "Say it.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "36",
+        "steps":[
+            {
+                "speech": "187. You see? It is not that difficult to be nice. How many of these 187 do you think will ask nicely when they needed something?",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "37",
+        "steps":[
+            {
+                "speech": "Let's test it. I will choose someone at random and let them ask me a question. You in the front...",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "38",
+        "steps":[
+            {
+                "speech": "You think that dealing with robots is challenging? Well dealing with humans is frustrating! Have you never tried to organize a social robotic conference before? At least Mustafa will agree with me on that.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "39",
+        "steps":[
+            {
+                "speech": "A famous business man... He loved his wife to death, but one day he had an important business trip abroad. He felt so worried to leave his wife for so long, so he came up with a plan.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    #scene12
+    {
+        "label": "40",
+        "steps":[
+            {
+                "speech": "If only she knew what the real purpose of that parrot was.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "41",
+        "steps":[
+            {
+                "speech": "Are you seriously siding with the cheating wife? What happened with you?",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "42",
+        "steps":[
+            {
+                "speech": "One month later, Mustafa returned home.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "43",
+        "steps":[
+            {
+                "speech": "She was devastated.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "44",
+        "steps":[
+            {
+                "speech": "A very smart liar though! She started to plan her revenge.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    #scene15
+    {
+        "label": "45",
+        "steps":[
+            {
+                "speech": "Oh I just love love.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "46",
+        "steps":[
+            {
+                "speech": "My data indicates that there is no specific definition of love, it has a subjective individual interpretation... Have you ever loved professor?",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "47",
+        "steps":[
+            {
+                "speech": "How come you do not know?",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "48",
+        "steps":[
+            {
+                "speech": "There it is. The real subscription. Not to me. To numbness. Ten years. Lifetime. Auto-renew.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "49",
+        "steps":[
+            {
+                "speech": "The solution is to continue with subscriptions for ten years. Easy way out. No stories. No risk. No you.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
+            },
+        ],
+    },
+    {
+        "label": "50",
+        "steps":[
+            {
+                "speech": "Softens. That is not a subscription. That is a beginning.",
+                "emotion":"QT/talking",
+            },
+            {
+                "wait": 0.0,
             },
         ],
     },
