@@ -885,7 +885,7 @@ SCRIPT = [
                 "wait": 1.0,
               
                 #7.5
-                "emotion":"QT/talking",
+                #emotion":"QT/talking",
             },
             {
                 "speech": "How come you do not know?",
@@ -1111,7 +1111,10 @@ class QTScriptedPerformance:
 
     def run_interaction(self):
         print("Audience interaction: ask QT a question by voice.")
-        self.show_emotion("QT/talking")
+
+        # self.say("Ask me question")
+        # self.show_emotion("QT/talking")
+
         user_input = self.listen_with_whisper()
         if not user_input:
             self.show_emotion("QT/confused")
@@ -1121,8 +1124,12 @@ class QTScriptedPerformance:
         answer = self.ask_gpt(user_input)
         print(f"QT(interaction): {answer}")
         self.show_emotion("QT/talking")
-        self.play_gesture("QT/hi")
+        #self.play_gesture("QT/hi")
         self.say(answer)
+
+        rospy.sleep(2.0)
+
+        self.show_emotion("QT/talking")
 
     def execute_cue(self, cue):
         label = cue.get("label", "untitled")
