@@ -39,7 +39,6 @@ from qt_robot_interface.srv import speech_config
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-RECORD_SECONDS = int(os.getenv("RECORD_SECONDS", "5"))
 IGNORED_TRANSCRIPTS = {"you", "thank you", "thanks"}
 
 CHANNELS = 1
@@ -1031,11 +1030,15 @@ class QTScriptedPerformance:
         self.publish_text(self.emotion_pub, emotion_name)
 
     def record_audio(self):
-        print(f"Listening for {RECORD_SECONDS} seconds...")
+        input("Press Enter to start recording...")
+        print("Recording... Press Enter to stop.")
         self.audio_frames = []
-        self.is_recording = True
-        rospy.sleep(RECORD_SECONDS)
-        self.is_recording = False
+        try:
+            self.is_recording = True
+            input()
+        finally:
+            self.is_recording = False
+
         audio_data = b"".join(self.audio_frames)
 
         if not audio_data:
