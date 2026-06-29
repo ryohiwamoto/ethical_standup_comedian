@@ -22,7 +22,7 @@
     #     ],
     # },
 
-
+#fix
 #!/usr/bin/env python3
 import os
 import tempfile
@@ -53,7 +53,7 @@ SCRIPT = [
         "steps": [
             {
                 "gesture":"QT/peekaboo",
-                "emotion": "",
+                
             },
 
         ],       
