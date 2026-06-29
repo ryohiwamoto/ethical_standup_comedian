@@ -20,7 +20,7 @@ import tempfile
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-RECORD_SECONDS = int(os.getenv('RECORD_SECONDS', '5'))
+RECORD_SECONDS = int(os.getenv('RECORD_SECONDS', '4'))
 CAMERA_INDEX = int(os.getenv('CAMERA_INDEX', '1'))
 IGNORED_TRANSCRIPTS = {"you", "thank you", "thanks"}
 MODERATION_MODEL = os.getenv('MODERATION_MODEL', 'omni-moderation-latest')
