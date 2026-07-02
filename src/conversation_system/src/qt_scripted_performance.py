@@ -39,6 +39,15 @@ from qt_robot_interface.srv import speech_config
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+API_TIMEOUT_SECONDS = 5
+JOKE_API_FALLBACK = (
+    "My analysis shows American humour uses volume because subtlety was apparently "
+    "not included in the national software update."
+)
+INTERACTION_API_FALLBACK = (
+    "Sorry, something went wrong. For a moment, my system reached the professor's "
+    "level of competence."
+)
 IGNORED_TRANSCRIPTS = {"you", "thank you", "thanks"}
 
 CHANNELS = 1
@@ -1069,6 +1078,7 @@ class QTScriptedPerformance:
                     model="whisper-1",
                     file=audio_file,
                     language="en",
+                    timeout=API_TIMEOUT_SECONDS,
                 )
 
             text = transcription.text.strip()
@@ -1092,7 +1102,7 @@ class QTScriptedPerformance:
             if os.path.exists(audio_path):
                 os.remove(audio_path)
 
-    def ask_gpt(self, prompt):
+    def ask_gpt(self, prompt, fallback_text="Sorry, my improvisation module failed."):
         system_prompt = (
             "Your name is QT robot. "
             "You are a friendly social robot performer. "
@@ -1106,11 +1116,12 @@ class QTScriptedPerformance:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
+                timeout=API_TIMEOUT_SECONDS,
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
             rospy.logerr(f"OpenAI API error: {e}")
-            return "Sorry, my improvisation module failed."
+            return fallback_text
 
     def run_interaction(self):
         print("Audience interaction: ask QT a question by voice.")
@@ -1121,10 +1132,10 @@ class QTScriptedPerformance:
         user_input = self.listen_with_whisper()
         if not user_input:
             self.show_emotion("QT/confused")
-            self.say("Sorry, I did not catch that.")
+            self.say(INTERACTION_API_FALLBACK)
             return
 
-        answer = self.ask_gpt(user_input)
+        answer = self.ask_gpt(user_input, fallback_text=INTERACTION_API_FALLBACK)
         print(f"QT(interaction): {answer}")
         self.show_emotion("QT/talking")
         #self.play_gesture("QT/hi")
@@ -1161,7 +1172,7 @@ class QTScriptedPerformance:
 
                 if api_prompt:
                     print(f"api_prompt:{api_prompt}")
-                    speech = self.ask_gpt(api_prompt)
+                    speech = self.ask_gpt(api_prompt, fallback_text=JOKE_API_FALLBACK)
                     print(f"QT(API): {speech}")
                 elif speech:
                     print(f"QT: {speech}")
