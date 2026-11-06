@@ -71,14 +71,16 @@ class MotionControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with patch.object(controller, "ROOT", Path(folder)), \
                  patch.object(controller, "get_status", side_effect=AssertionError("Network accessed")), \
-                 patch("sys.argv", ["controller"]), \
-                 patch("builtins.input", side_effect=["2", "", "looks fine", "q"]):
+                 patch("sys.argv", ["controller", "--angle", "30"]), \
+                 patch("builtins.input", side_effect=["4", "2", "", "looks fine", "q"]):
                 controller.main()
             import csv
             with next((Path(folder) / "logs").glob("*.csv")).open(encoding="utf-8-sig", newline="") as stream:
                 rows = list(csv.DictReader(stream))
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["status"], "preview_only")
+            self.assertEqual(rows[0]["case"], "pitch_positive")
+            self.assertEqual(float(rows[0]["pitch_delta_deg"]), 30)
             self.assertEqual(rows[0]["memo"], "looks fine")
 
     def test_status_check_never_enters_motion_menu(self):
@@ -88,7 +90,7 @@ class MotionControllerTests(unittest.TestCase):
             controller.main()
 
     def test_invalid_numeric_arguments_are_rejected(self):
-        for value in ("nan", "inf", "0", "11"):
+        for value in ("nan", "inf", "0", "31"):
             with patch("sys.argv", ["controller", "--angle", value]):
                 with self.assertRaises(SystemExit) as result:
                     controller.main()

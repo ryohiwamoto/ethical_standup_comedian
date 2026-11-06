@@ -45,14 +45,14 @@ def require_ready(status):
         raise RuntimeError("Wake Up the robot in Control, then retry.")
 
 
-def validate_baseline(pose):
+def validate_baseline(pose, max_rotation=20):
     import numpy as np
 
     if pose.shape != (4, 4) or not np.isfinite(pose).all():
         raise RuntimeError("Invalid starting head pose.")
     cosine = float(np.clip((np.trace(pose[:3, :3]) - 1) / 2, -1, 1))
-    if math.degrees(math.acos(cosine)) > 20:
-        raise RuntimeError("Start with the head near its neutral orientation.")
+    if math.degrees(math.acos(cosine)) > max_rotation:
+        raise RuntimeError(f"Start with the head within {max_rotation} degrees of neutral.")
     if np.linalg.norm(pose[:3, 3]) > 0.03:
         raise RuntimeError("Starting head translation exceeds the pilot limit.")
 
@@ -66,7 +66,7 @@ def create_relative_head_pose(pitch, yaw):
 def execute_trial(robot, pitch, yaw, move_seconds, hold_seconds):
     require_ready(get_status())
     baseline = robot.get_current_head_pose().copy()
-    validate_baseline(baseline)
+    validate_baseline(baseline, max_rotation=5 if abs(pitch) > 10 else 20)
     target = baseline @ create_relative_head_pose(pitch, yaw)
     data = {
         "baseline_pose": json.dumps(baseline.tolist()),
@@ -114,6 +114,9 @@ def run_menu(robot, args):
         if choice not in CASES:
             continue
         name, pitch_sign, yaw_sign = CASES[choice]
+        if yaw_sign and args.angle > 10:
+            print("Yaw requires --angle 10 or less. Choose Still or Pitch.")
+            continue
         pitch, yaw = pitch_sign * args.angle, yaw_sign * args.angle
         print(f"{name}: pitch={pitch}, yaw={yaw}, move={args.move}s, hold={args.hold}s, return.")
         if input("Press Enter to execute; type anything to cancel: "):
@@ -154,11 +157,11 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--robot", action="store_true", help="Allow manual real-robot trials")
     mode.add_argument("--check", action="store_true", help="Read daemon status only; no SDK connection or motion")
-    parser.add_argument("--angle", type=float, default=5.0, help="Relative angle, 1 to 10 degrees")
+    parser.add_argument("--angle", type=float, default=5.0, help="Relative angle: pitch 1 to 30, yaw 1 to 10 degrees")
     parser.add_argument("--move", type=float, default=1.5, help="Each outward/return motion, 1 to 5 seconds")
     parser.add_argument("--hold", type=float, default=1.0, help="Hold time, 0 to 10 seconds")
     args = parser.parse_args()
-    for flag, value, low, high in (("angle", args.angle, 1, 10), ("move", args.move, 1, 5), ("hold", args.hold, 0, 10)):
+    for flag, value, low, high in (("angle", args.angle, 1, 30), ("move", args.move, 1, 5), ("hold", args.hold, 0, 10)):
         if not math.isfinite(value) or not low <= value <= high:
             parser.error(f"--{flag} must be between {low} and {high}")
     if args.check:
