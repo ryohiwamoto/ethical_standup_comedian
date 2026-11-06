@@ -46,7 +46,48 @@ class MotionControllerTests(unittest.TestCase):
         self.assertNotEqual(data["target_pose"], data["baseline_pose"])
         self.assertEqual(data["hold_end_pose"], data["target_pose"])
         self.assertEqual(data["settled_return_pose"], data["baseline_pose"])
-        self.assertEqual(sleep.call_args_list, [unittest.mock.call(1), unittest.mock.call(0.5)])
+        self.assertEqual(data["return_after_3s_pose"], data["baseline_pose"])
+        self.assertEqual(data["status"], "sequence_completed")
+        self.assertEqual(sleep.call_args_list, [unittest.mock.call(1), unittest.mock.call(0.5), unittest.mock.call(2.5)])
+
+    def test_return_outside_tolerance_stops_menu_without_retry(self):
+        import csv
+        from argparse import Namespace
+        import numpy as np
+
+        baseline = np.eye(4)
+        residual = baseline.copy()
+        residual[0, 3] = 0.003
+        robot = unittest.mock.Mock()
+        robot.get_current_head_pose.side_effect = [baseline] + [residual] * 5
+        ready = {"state": "running", "backend_status": {"ready": True, "motor_control_mode": "enabled"}}
+        args = Namespace(preview=False, angle=10, move=3, hold=1, case=None)
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(controller, "ROOT", Path(folder)), \
+                 patch.object(controller, "get_status", return_value=ready), \
+                 patch.object(controller, "create_relative_head_pose", return_value=baseline), \
+                 patch.object(controller.time, "sleep"), \
+                 patch("builtins.input", side_effect=["2", "", ""]):
+                controller.run_menu(robot, args)
+            with next((Path(folder) / "logs").glob("*.csv")).open(encoding="utf-8-sig", newline="") as stream:
+                row = next(csv.DictReader(stream))
+        self.assertEqual(row["status"], "return_not_reached")
+        self.assertAlmostEqual(float(row["return_translation_error_mm"]), 3)
+        self.assertEqual(robot.goto_target.call_count, 2)
+
+    def test_programmed_preview_runs_once_without_menu(self):
+        import csv
+
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(controller, "ROOT", Path(folder)), \
+                 patch.object(controller, "get_status", side_effect=AssertionError("Network accessed")), \
+                 patch("builtins.input", side_effect=["", ""]):
+                controller.main(["--case", "pitch_positive", "--angle", "10", "--move", "3", "--hold", "1"])
+            with next((Path(folder) / "logs").glob("*.csv")).open(encoding="utf-8-sig", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["case"], "pitch_positive")
+        self.assertEqual(rows[0]["status"], "preview_only")
 
     def test_fault_does_not_queue_return_motion(self):
         import numpy as np
