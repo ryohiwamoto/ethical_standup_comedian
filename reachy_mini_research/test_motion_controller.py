@@ -36,7 +36,7 @@ class MotionControllerTests(unittest.TestCase):
         ready = {"state": "running", "backend_status": {"ready": True, "motor_control_mode": "enabled"}}
         with patch.object(controller, "get_status", return_value=ready), \
              patch.object(controller, "create_relative_head_pose", return_value=relative_pose) as create_pose, \
-             patch.object(controller.time, "sleep"):
+             patch.object(controller.time, "sleep") as sleep:
             data = controller.execute_trial(robot, 0, 5, 1.5, 1)
         create_pose.assert_called_once_with(0, 5)
         self.assertEqual(len(robot.calls), 2)
@@ -44,6 +44,9 @@ class MotionControllerTests(unittest.TestCase):
         np.testing.assert_allclose(robot.calls[0]["head"], relative_pose)
         np.testing.assert_allclose(robot.pose, np.eye(4))
         self.assertNotEqual(data["target_pose"], data["baseline_pose"])
+        self.assertEqual(data["hold_end_pose"], data["target_pose"])
+        self.assertEqual(data["settled_return_pose"], data["baseline_pose"])
+        self.assertEqual(sleep.call_args_list, [unittest.mock.call(1), unittest.mock.call(0.5)])
 
     def test_fault_does_not_queue_return_motion(self):
         import numpy as np

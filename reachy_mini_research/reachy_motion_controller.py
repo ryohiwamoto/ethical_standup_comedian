@@ -22,6 +22,7 @@ FIELDS = (
     "timestamp", "trial_id", "mode", "case", "pitch_delta_deg", "yaw_delta_deg",
     "move_seconds", "hold_seconds", "elapsed_seconds", "baseline_pose",
     "target_pose", "observed_pose", "return_pose", "status", "error", "memo",
+    "hold_end_pose", "settled_return_pose",
 )
 
 
@@ -79,11 +80,14 @@ def execute_trial(robot, pitch, yaw, move_seconds, hold_seconds):
     data["observed_pose"] = json.dumps(robot.get_current_head_pose().tolist())
     time.sleep(hold_seconds)
     require_ready(get_status())
+    data["hold_end_pose"] = json.dumps(robot.get_current_head_pose().tolist())
     if moving:
         robot.goto_target(head=baseline, duration=move_seconds, body_yaw=None)
     else:
         time.sleep(move_seconds)
     data["return_pose"] = json.dumps(robot.get_current_head_pose().tolist())
+    time.sleep(0.5)
+    data["settled_return_pose"] = json.dumps(robot.get_current_head_pose().tolist())
     return data
 
 
