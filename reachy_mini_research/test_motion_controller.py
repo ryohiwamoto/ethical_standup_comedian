@@ -25,11 +25,23 @@ class MotionControllerTests(unittest.TestCase):
                 self.pose = kwargs["head"].copy()
 
         robot = FakeRobot()
+        angle = np.deg2rad(5)
+        cosine, sine = np.cos(angle), np.sin(angle)
+        relative_pose = np.array([
+            [cosine, -sine, 0, 0],
+            [sine, cosine, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
         ready = {"state": "running", "backend_status": {"ready": True, "motor_control_mode": "enabled"}}
-        with patch.object(controller, "get_status", return_value=ready), patch.object(controller.time, "sleep"):
+        with patch.object(controller, "get_status", return_value=ready), \
+             patch.object(controller, "create_relative_head_pose", return_value=relative_pose) as create_pose, \
+             patch.object(controller.time, "sleep"):
             data = controller.execute_trial(robot, 0, 5, 1.5, 1)
+        create_pose.assert_called_once_with(0, 5)
         self.assertEqual(len(robot.calls), 2)
         self.assertTrue(all(call["body_yaw"] is None for call in robot.calls))
+        np.testing.assert_allclose(robot.calls[0]["head"], relative_pose)
         np.testing.assert_allclose(robot.pose, np.eye(4))
         self.assertNotEqual(data["target_pose"], data["baseline_pose"])
 
@@ -40,7 +52,8 @@ class MotionControllerTests(unittest.TestCase):
         robot.get_current_head_pose.return_value = np.eye(4)
         robot.goto_target.side_effect = RuntimeError("motion rejected")
         ready = {"state": "running", "backend_status": {"ready": True, "motor_control_mode": "enabled"}}
-        with patch.object(controller, "get_status", return_value=ready):
+        with patch.object(controller, "get_status", return_value=ready), \
+             patch.object(controller, "create_relative_head_pose", return_value=np.eye(4)):
             with self.assertRaisesRegex(RuntimeError, "motion rejected"):
                 controller.execute_trial(robot, 5, 0, 1.5, 1)
         self.assertEqual(robot.goto_target.call_count, 1)

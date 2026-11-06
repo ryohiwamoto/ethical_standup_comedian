@@ -56,13 +56,17 @@ def validate_baseline(pose):
         raise RuntimeError("Starting head translation exceeds the pilot limit.")
 
 
-def execute_trial(robot, pitch, yaw, move_seconds, hold_seconds):
+def create_relative_head_pose(pitch, yaw):
     from reachy_mini.utils import create_head_pose
 
+    return create_head_pose(pitch=pitch, yaw=yaw, degrees=True)
+
+
+def execute_trial(robot, pitch, yaw, move_seconds, hold_seconds):
     require_ready(get_status())
     baseline = robot.get_current_head_pose().copy()
     validate_baseline(baseline)
-    target = baseline @ create_head_pose(pitch=pitch, yaw=yaw, degrees=True)
+    target = baseline @ create_relative_head_pose(pitch, yaw)
     data = {
         "baseline_pose": json.dumps(baseline.tolist()),
         "target_pose": json.dumps(target.tolist()),
